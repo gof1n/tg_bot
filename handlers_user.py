@@ -4,6 +4,7 @@ User Bot — клиентская логика: каталог, корзина, 
 Фото: file_id → локальный файл → скачивание по ссылке из таблицы (image_url).
 """
 
+import asyncio
 import os
 from typing import Optional
 
@@ -263,8 +264,11 @@ def register_user_handlers(router: Router, db: Database, bot, admin_bot=None, ad
             except Exception:
                 pass
             return
-        # Только товары в наличии (in_stock) из таблицы
+        # Только товары в наличии (in_stock) из таблицы. Повторный запрос при пустом ответе (обход гонки/блокировки SQLite при первом обращении).
         groups = await db.get_groups_by_category(category)
+        if not groups:
+            await asyncio.sleep(0.2)
+            groups = await db.get_groups_by_category(category)
         if not groups:
             try:
                 await callback.message.edit_text(
@@ -305,10 +309,16 @@ def register_user_handlers(router: Router, db: Database, bot, admin_bot=None, ad
         _, category, idx = callback.data.split(":", 2)
         idx = int(idx)
         groups = await db.get_groups_by_category(category)
+        if not groups:
+            await asyncio.sleep(0.2)
+            groups = await db.get_groups_by_category(category)
         if idx < 0 or idx >= len(groups):
             return
         group_name = groups[idx]
         products = await db.get_products_by_group(category, group_name)
+        if not products:
+            await asyncio.sleep(0.2)
+            products = await db.get_products_by_group(category, group_name)
         if not products:
             try:
                 await callback.message.answer("Нет доступных вариантов.")
