@@ -43,15 +43,29 @@ def get_catalog_categories_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def get_groups_keyboard(category: str, groups: list) -> InlineKeyboardMarkup:
-    """Список товарных групп (group_name) в категории — по 2 кнопки в ряд."""
+GROUPS_PER_PAGE = 7
+
+
+def get_groups_keyboard(category: str, groups: list, page: int = 0) -> InlineKeyboardMarkup:
+    """Список товарных групп по 7 на странице, кнопки вперёд/назад."""
     builder = InlineKeyboardBuilder()
-    for i, g in enumerate(groups):
+    start = page * GROUPS_PER_PAGE
+    end = min(start + GROUPS_PER_PAGE, len(groups))
+    for i in range(start, end):
+        g = groups[i]
         builder.add(
             InlineKeyboardButton(text=g[:60], callback_data=f"grp:{category}:{i}")
         )
     builder.adjust(2)
-    builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="cat:back"))
+    # Навигация по страницам
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton(text="◀️ Назад", callback_data=f"catpg:{category}:{page - 1}"))
+    if end < len(groups):
+        nav.append(InlineKeyboardButton(text="Вперёд ▶️", callback_data=f"catpg:{category}:{page + 1}"))
+    if nav:
+        builder.row(*nav)
+    builder.row(InlineKeyboardButton(text="◀️ К категориям", callback_data="cat:back"))
     return builder.as_markup()
 
 

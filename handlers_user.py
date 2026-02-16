@@ -285,12 +285,55 @@ def register_user_handlers(router: Router, db: Database, bot, admin_bot=None, ad
                     reply_markup=get_catalog_categories_keyboard(),
                 )
             return
-        text = f"Категория: {CATEGORY_NAMES.get(category, category)}\n\nВыберите товар:"
-        markup = get_groups_keyboard(category, groups)
+        from keyboards import GROUPS_PER_PAGE
+        total_pages = (len(groups) + GROUPS_PER_PAGE - 1) // GROUPS_PER_PAGE
+        text = (
+            f"Категория: {CATEGORY_NAMES.get(category, category)}\n\n"
+            f"Выберите товар (стр. 1 из {total_pages}):"
+        )
+        markup = get_groups_keyboard(category, groups, page=0)
         try:
             await callback.message.edit_text(text, reply_markup=markup)
         except Exception:
             # Сообщение с фото нельзя edit_text — удаляем и отправляем новое
+            try:
+                await callback.message.delete()
+            except Exception:
+                pass
+            await callback.message.answer(text, reply_markup=markup)
+
+    @router.callback_query(F.data.startswith("catpg:"))
+    async def catalog_category_page(callback: CallbackQuery):
+        """Переход по страницам списка товаров в категории (7 на странице)."""
+        if register_callback_id_and_is_duplicate(callback.id):
+            await callback.answer()
+            return
+        if throttle_callback(callback.from_user.id, callback.data):
+            await callback.answer()
+            return
+        await callback.answer()
+        _, category, page_str = callback.data.split(":", 2)
+        try:
+            page = max(0, int(page_str))
+        except ValueError:
+            page = 0
+        groups = await db.get_groups_by_category(category)
+        if not groups:
+            await asyncio.sleep(0.2)
+            groups = await db.get_groups_by_category(category)
+        if not groups:
+            return
+        from keyboards import GROUPS_PER_PAGE
+        total_pages = (len(groups) + GROUPS_PER_PAGE - 1) // GROUPS_PER_PAGE
+        page = min(page, total_pages - 1) if total_pages else 0
+        text = (
+            f"Категория: {CATEGORY_NAMES.get(category, category)}\n\n"
+            f"Выберите товар (стр. {page + 1} из {total_pages}):"
+        )
+        markup = get_groups_keyboard(category, groups, page=page)
+        try:
+            await callback.message.edit_text(text, reply_markup=markup)
+        except Exception:
             try:
                 await callback.message.delete()
             except Exception:
