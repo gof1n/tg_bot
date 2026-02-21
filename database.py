@@ -13,7 +13,8 @@ class Database:
         self.db_path = db_path
 
     async def init_db(self):
-        """Инициализация БД и создание таблиц."""
+        """Инициализация БД: создание пустых таблиц. Товары в каталог не добавляются —
+        только после нажатия «Обновить базу» в админ-боте (синхронизация из CSV/таблицы)."""
         async with aiosqlite.connect(self.db_path) as db:
             # Если таблица products со старой схемой (без sku/group_name) — пересоздаём
             try:
